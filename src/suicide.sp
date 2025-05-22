@@ -6,13 +6,12 @@ public Plugin:myinfo =
     name = "EndSaferoom/Incapped/TruckDepot Suicide",
     author = "You & Grok",
     description = "Allows suicide in end saferoom, when incapacitated, near the truck in Crash Course Truck Depot, or for admins anywhere",
-    version = "2.2",
+    version = "2.3",
     url = ""
 };
 
 bool g_bMessageSent[MAXPLAYERS + 1]; // Tracks if message was sent to each player
 bool g_bAllowSafeZoneMessages = false; // Tracks if initial delay has passed
-bool g_bHasLeftStartSaferoom[MAXPLAYERS + 1]; // Tracks if player has left start saferoom
 
 public OnPluginStart()
 {
@@ -31,7 +30,6 @@ public OnMapStart()
     for (int i = 1; i <= MaxClients; i++)
     {
         g_bMessageSent[i] = false;
-        g_bHasLeftStartSaferoom[i] = false;
     }
     
     // Disable safe zone messages for the first 30 seconds
@@ -49,7 +47,6 @@ public OnClientDisconnect(client)
 {
     // Reset status when a client disconnects
     g_bMessageSent[client] = false;
-    g_bHasLeftStartSaferoom[client] = false;
 }
 
 bool IsInEndSaferoom(client)
@@ -57,30 +54,36 @@ bool IsInEndSaferoom(client)
     float clientPos[3];
     GetClientAbsOrigin(client, clientPos);
     int entity = -1;
-    bool isNearAnyDoor = false;
     
+    // Check for checkpoint doors
     while ((entity = FindEntityByClassname(entity, "prop_door_rotating_checkpoint")) != -1)
     {
         float doorPos[3];
         GetEntPropVector(entity, Prop_Send, "m_vecOrigin", doorPos);
         if (GetVectorDistance(clientPos, doorPos) < 400.0)
         {
-            isNearAnyDoor = true;
             int locked = GetEntProp(entity, Prop_Data, "m_bLocked");
             if (locked == 0)
             {
-                // Debug: Show door position to player
-                PrintToChat(client, "\x04[Suicide Debug]\x01 Detected unlocked saferoom door at Pos=%.1f %.1f %.1f", 
-                    doorPos[0], doorPos[1], doorPos[2]);
+                PrintToServer("[Suicide] Player %N near unlocked saferoom door at Pos=%.1f %.1f %.1f", 
+                    client, doorPos[0], doorPos[1], doorPos[2]);
                 return true; // Unlocked = end saferoom
             }
         }
     }
     
-    // If player is not near any checkpoint door, mark as having left start saferoom
-    if (!isNearAnyDoor && IsClientInGame(client) && IsPlayerAlive(client))
+    // Fallback: Check for trigger_finale (common in end saferooms)
+    entity = -1;
+    while ((entity = FindEntityByClassname(entity, "trigger_finale")) != -1)
     {
-        g_bHasLeftStartSaferoom[client] = true;
+        float finalePos[3];
+        GetEntPropVector(entity, Prop_Send, "m_vecOrigin", finalePos);
+        if (GetVectorDistance(clientPos, finalePos) < 400.0)
+        {
+            PrintToServer("[Suicide] Player %N near trigger_finale at Pos=%.1f %.1f %.1f", 
+                client, finalePos[0], finalePos[1], finalePos[2]);
+            return true;
+        }
     }
     
     return false;
@@ -124,23 +127,32 @@ public Action:Timer_CheckSafeZone(Handle:timer)
 {
     if (!g_bAllowSafeZoneMessages)
     {
-        return Plugin_Continue; // Skip checks until 30 seconds have passed
+        return Plugin_Continue;
     }
     
     for (int client = 1; client <= MaxClients; client++)
     {
-        if (IsClientInGame(client) && !g_bMessageSent[client] && IsPlayerAlive(client) && g_bHasLeftStartSaferoom[client])
+        if (IsClientInGame(client) && !g_bMessageSent[client] && IsPlayerAlive(client))
         {
-            // Check if player is in a safe zone
-            if (IsInEndSaferoom(client) || IsInTruckDepotGreenZone(client))
+            bool inEndSaferoom = IsInEndSaferoom(client);
+            bool inTruckDepotGreenZone = IsInTruckDepotGreenZone(client);
+            if (inEndSaferoom || inTruckDepotGreenZone)
             {
-                // Send personal message
                 PrintToChat(client, "\x04[Suicide]\x01 Type !suicide to kill yourself. Only works in the end saferoom, when incapacitated, or near the truck in Truck Depot.");
                 if (GetUserFlagBits(client) & (ADMFLAG_GENERIC | ADMFLAG_ROOT))
                 {
                     PrintToChat(client, "\x04[Suicide]\x01 As an admin, you can suicide anywhere!");
                 }
                 g_bMessageSent[client] = true;
+            }
+            else
+            {
+                float pos[3];
+                GetClientAbsOrigin(client, pos);
+                char mapName[64];
+                GetCurrentMap(mapName, sizeof(mapName));
+                PrintToServer("[Suicide] No message for %N: Map=%s, EndSaferoom=%d, TruckDepot=%d, Pos=%.1f %.1f %.1f", 
+                    client, mapName, inEndSaferoom, inTruckDepotGreenZone, pos[0], pos[1], pos[2]);
             }
         }
     }
@@ -232,6 +244,16 @@ public Action:Command_DumpEntities(client, args)
         float pos[3];
         GetEntPropVector(entity, Prop_Send, "m_vecOrigin", pos);
         PrintToServer("Entity=%d, Model=%s, Pos=%.1f %.1f %.1f", entity, modelName, pos[0], pos[1], pos[2]);
+    }
+    
+    // Dump trigger_finale entities for debugging
+    entity = -1;
+    PrintToServer("[Suicide] Dumping trigger_finale entities:");
+    while ((entity = FindEntityByClassname(entity, "trigger_finale")) != -1)
+    {
+        float pos[3];
+        GetEntPropVector(entity, Prop_Send, "m_vecOrigin", pos);
+        PrintToServer("Entity=%d, Class=trigger_finale, Pos=%.1f %.1f %.1f", entity, pos[0], pos[1], pos[2]);
     }
     
     ReplyToCommand(client, "\x04[Suicide]\x01 Entity positions logged to server console.");
