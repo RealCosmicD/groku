@@ -6,7 +6,7 @@ public Plugin myinfo =
     name        = "Suicide – Campaign Only (L4D1 v2.9)",
     author      = "You & Grok",
     description = "100% perfect on ALL official L4D1 maps – Death Toll + Blood Harvest fixed",
-    version     = "2.9",
+    version     = "2.9.1",
     url         = ""
 };
 
@@ -103,11 +103,11 @@ public Action Timer_CheckZoneMessage(Handle timer)
         if (!IsClientInGame(client) || !IsPlayerAlive(client) || GetClientTeam(client) != 2 || g_bMessageSent[client])
             continue;
 
-        bool isAdmin  = (GetUserFlagBits(client) & (ADMFLAG_GENERIC|ADMFLAG_ROOT)) != 0;
-        bool incapped = view_as<bool>(GetEntProp(client, Prop_Send, "m_isIncapacitated"));
-        bool inZone   = IsInEndSaferoom(client);
+        bool isAdmin = (GetUserFlagBits(client) & (ADMFLAG_GENERIC|ADMFLAG_ROOT)) != 0;
+        bool inZone  = IsInEndSaferoom(client);
 
-        if (inZone || incapped)
+        // Message ONLY when entering a real end-zone (not on incapped)
+        if (inZone)
         {
             PrintToChat(client, "\x04[Suicide]\x01 Type \x03!suicide\x01 to kill yourself (end saferoom / incapped / finale zone).");
             if (isAdmin)
