@@ -7,7 +7,7 @@ public Plugin myinfo =
     name = "Custom Achievements",
     author = "You & Grok",
     description = "Tracks damage, kills, and weapon usage across a campaign for server achievements",
-    version = "1.15",
+    version = "1.16",
     url = ""
 };
 
@@ -24,7 +24,7 @@ char g_sLastVoteIssue[64];
 #define TITANIUM_FILE "addons/sourcemod/data/titanium_history.txt"
 #define GLASS_FILE "addons/sourcemod/data/glass_history.txt"
 #define PRO_FILE "addons/sourcemod/data/pro_history.txt"
-#define ACHIEVEMENT_SOUND "ui/achievement_earned.wav"
+#define ACHIEVEMENT_SOUND "sound/ui/pickup_misc42.wav"
 
 public void OnPluginStart()
 {
